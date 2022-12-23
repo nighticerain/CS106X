@@ -12,6 +12,7 @@ using namespace std;
 #include "simpio.h"  // for getLine
 #include "gevents.h" // for mouse event detection
 #include "strlib.h"
+#include "gtimer.h"
 
 #include "life-constants.h"  // for kMaxAge
 #include "life-graphics.h"   // for class LifeDisplay
@@ -32,6 +33,7 @@ static void welcome() {
     getLine("Hit [enter] to continue....   ");
 }
 
+
 /**
  * Function: initFileGrid
  * ----------------------
@@ -45,9 +47,9 @@ void initFileGrid(Grid<int>& grid, ifstream& fs) {
         if (line[0] == '#') {
             continue;
         } else if (row == 0) {
-            row = stoi(line);
+            row = stringToInteger(line);
         } else if (col == 0) {
-            col = stoi(line);
+            col = stringToInteger(line);
         } else {
             if (rIndex == 0) {
                 grid.resize(row, col);
@@ -62,6 +64,7 @@ void initFileGrid(Grid<int>& grid, ifstream& fs) {
         }
     }
 }
+
 
 /**
  * Function: initRandomGrid
@@ -82,6 +85,7 @@ void initRandomGrid(Grid<int>& grid) {
         }
     }
 }
+
 
 /**
  * Function: init
@@ -114,16 +118,42 @@ void init(Grid<int>& grid) {
     }
 }
 
-void drawGrid(Grid<int>& grid, LifeDisplay& display) {
-    display.setDimensions(grid.numRows(), grid.numCols());
-    for (int r=0; r<grid.numRows(); r++) {
-        for (int c=0; c<grid.numCols(); c++) {
-            display.drawCellAt(r, c, grid[r][c]);
+
+/**
+ * Function: getSpeedChoice
+ * --------------
+ * Get speed choice from user
+ */
+int getSpeedChoice() {
+    cout << "You choose how fast to run the simulation." << endl;
+	cout << "\t1 = As fast as this chip can go!" << endl;
+	cout << "\t2 = Not too fast, this is a school zone." << endl;
+	cout << "\t3 = Nice and slow so I can watch everything that happens." << endl;
+	cout << "\t4 = Require enter key be pressed before advancing to next generation." << endl;
+
+    int choice;
+    while (true) {
+        string response = getLine("Your Choice: ");
+        if (stringIsInteger(response)) {
+            choice = stringToInteger(response);
+            if (choice == 1 || choice == 2 || choice == 3 || choice == 4) {
+                break;
+            } else {
+                cout << "Please enter a number between 1 and 4!" << endl;
+            }
+        } else {
+            cout << "Illegal integer format. Try again." << endl;
         }
     }
+    return choice;
 }
 
 
+/**
+ * Function: getNextGrid
+ * --------------
+ * Return the next generation grid
+ */
 Grid<int> getNextGrid(const Grid<int>& grid) {
     int row = grid.numRows();
     int col = grid.numCols();
@@ -163,6 +193,53 @@ Grid<int> getNextGrid(const Grid<int>& grid) {
     return nextGrid;
 }
 
+
+/**
+ * Function: drawGrid
+ * --------------
+ * Draw the grid on canvas
+ */
+void drawGrid(Grid<int>& grid, LifeDisplay& display) {
+    display.setDimensions(grid.numRows(), grid.numCols());
+    for (int r=0; r<grid.numRows(); r++) {
+        for (int c=0; c<grid.numCols(); c++) {
+            display.drawCellAt(r, c, grid[r][c]);
+        }
+    }
+    display.repaint();
+}
+
+
+/**
+ * Function: runAminimation
+ * -------------------------
+ * @param display
+ * @param grid
+ * @param ms: in milliseconds, the frame time, or speed chosen by the user;
+ * This method is called when the user desn't choose the manual mode.
+ * When the colony is stable or the user click the window, the stimulation will end.
+ */
+static void runAminimation(LifeDisplay &display, Grid<int> &grid, int ms) {
+    GTimer timer(ms);
+    timer.start();
+    while(true) {
+        GEvent event = waitForEvent(TIMER_EVENT + MOUSE_EVENT);
+        if (event.getEventClass() == TIMER_EVENT) {
+            drawGrid(grid, display);
+            Grid<int> nextGrid = getNextGrid(grid);
+            if (nextGrid == grid) {
+                break; // become stabled
+            } else {
+                grid = nextGrid; // iterate again
+            }
+        } else if (event.getEventType() == MOUSE_PRESSED) {
+            break;
+        }
+    }
+    timer.stop();
+}
+
+
 /**
  * Function: main
  * --------------
@@ -175,9 +252,28 @@ int main() {
 
     Grid<int> grid;
     init(grid);
-    drawGrid(grid, display);
-    display.repaint();
-    display.printBoard();
+
+    int choice = getSpeedChoice();
+    switch (choice) {
+        case 1:
+            runAminimation(display, grid, 500);
+            break;
+
+        case 2:
+            runAminimation(display, grid, 1000);
+            break;
+
+        case 3:
+            runAminimation(display, grid, 2000);
+            break;
+
+        case 4:
+            // Todo: Manual mode
+            break;
+
+        default:
+            break;
+    }
 
     return 0;
 }
