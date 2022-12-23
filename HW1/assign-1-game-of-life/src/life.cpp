@@ -92,13 +92,13 @@ void initRandomGrid(Grid<int>& grid) {
  * --------------
  * Init the grid
  */
-void init(Grid<int>& grid) {
+void init(LifeDisplay& display, Grid<int>& grid) {
     cout << "You can start your colony with random cells or read from a prepared file." << endl;
     ifstream fs;
     string fileName;
 
     while (true) {
-        fileName = getLine("Enter name of colony file (or RETURN to seed randomly):");
+        fileName = getLine("Enter name of colony file (or RETURN to seed randomly): ");
         if (fileName.empty()) {
             break;
         } else {
@@ -112,10 +112,30 @@ void init(Grid<int>& grid) {
     }
 
     if (fileName.empty()) {
+        display.setTitle("Random Colony");
         initRandomGrid(grid);
     } else {
+        display.setTitle(fileName);
         initFileGrid(grid, fs);
     }
+}
+
+
+/**
+ * Function: isAllOverMaxAge
+ * --------------
+ * Make a judgement about whether all cells' ages in the grid
+ * are over kMaxAge 
+ */
+bool isAllOverMaxAge(Grid<int>& grid) {
+    for (int r=0; r<grid.numRows(); r++) {
+        for (int c=0; c<grid.numCols(); c++) {
+            if (grid[r][c] > 0 && grid[r][c] < kMaxAge) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 
@@ -177,11 +197,11 @@ Grid<int> getNextGrid(const Grid<int>& grid) {
                     break;
                 
                 case 2:
-                    nextGrid[r][c] = grid[r][c];
+                    nextGrid[r][c] = grid[r][c] > 0 ? grid[r][c] + 1 : 0;
                     break;
 
                 case 3:
-                    nextGrid[r][c] = 1;
+                    nextGrid[r][c] = grid[r][c] + 1;
                     break;
 
                 default:
@@ -199,7 +219,7 @@ Grid<int> getNextGrid(const Grid<int>& grid) {
  * --------------
  * Draw the grid on canvas
  */
-void drawGrid(Grid<int>& grid, LifeDisplay& display) {
+void drawGrid(LifeDisplay& display, Grid<int>& grid) {
     display.setDimensions(grid.numRows(), grid.numCols());
     for (int r=0; r<grid.numRows(); r++) {
         for (int c=0; c<grid.numCols(); c++) {
@@ -207,6 +227,31 @@ void drawGrid(Grid<int>& grid, LifeDisplay& display) {
         }
     }
     display.repaint();
+}
+
+
+/**
+ * Function: manualAminimation
+ * -------------------------
+ * @param display
+ * @param grid
+ * This method is called when the user choose the manual mode.
+ * When the colony is stable or the user input "quit", the stimulation will end.
+ */
+static void manualAminimation(LifeDisplay &display, Grid<int> &grid) {
+    while (true) {
+        drawGrid(display, grid);
+        string response = getLine("Please return to advance [or type out \"quit\" to end]: ");
+        if (response == "quit") {
+            break;
+        }
+        Grid<int> nextGrid = getNextGrid(grid);
+        if (nextGrid == grid && isAllOverMaxAge(grid)) {
+            break; // become stabled
+        } else {
+            grid = nextGrid; // iterate again
+        }
+    }
 }
 
 
@@ -225,12 +270,12 @@ static void runAminimation(LifeDisplay &display, Grid<int> &grid, int ms) {
     while(true) {
         GEvent event = waitForEvent(TIMER_EVENT + MOUSE_EVENT);
         if (event.getEventClass() == TIMER_EVENT) {
-            drawGrid(grid, display);
+            drawGrid(display, grid);
             Grid<int> nextGrid = getNextGrid(grid);
-            if (nextGrid == grid) {
-                break; // become stabled
+            if (nextGrid == grid && isAllOverMaxAge(grid)) {
+                break;
             } else {
-                grid = nextGrid; // iterate again
+                grid = nextGrid;
             }
         } else if (event.getEventType() == MOUSE_PRESSED) {
             break;
@@ -251,28 +296,45 @@ int main() {
     welcome();
 
     Grid<int> grid;
-    init(grid);
+    
+    while (true) {
+        init(display, grid);
+        drawGrid(display, grid);
+        int choice = getSpeedChoice();
+        switch (choice) {
+            case 1:
+                runAminimation(display, grid, 500);
+                break;
 
-    int choice = getSpeedChoice();
-    switch (choice) {
-        case 1:
-            runAminimation(display, grid, 500);
-            break;
+            case 2:
+                runAminimation(display, grid, 1000);
+                break;
 
-        case 2:
-            runAminimation(display, grid, 1000);
-            break;
+            case 3:
+                runAminimation(display, grid, 2000);
+                break;
 
-        case 3:
-            runAminimation(display, grid, 2000);
-            break;
+            case 4:
+                manualAminimation(display, grid);
+                break;
 
-        case 4:
-            // Todo: Manual mode
-            break;
+            default:
+                break;
+        }
 
-        default:
+        grid.clear();
+        string response;
+        while (true) {
+            response = getLine("Would you like to run another? ");
+            if (response == "yes" || response == "no") {
+                break;
+            } else {
+                cout << "Please enter \"yes\" or \"no\"." << endl;
+            }
+        }
+        if (response == "no") {
             break;
+        }
     }
 
     return 0;
